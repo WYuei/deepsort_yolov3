@@ -22,7 +22,7 @@ from keras import backend
 
 backend.clear_session()
 ap = argparse.ArgumentParser()
-ap.add_argument("-i", "--input", help="path to input video", default="a001.mp4")
+ap.add_argument("-i", "--input", help="path to input video", default="filmage001.avi")
 ap.add_argument("-c", "--class", help="name of class", default="car")
 args = vars(ap.parse_args())
 
@@ -77,8 +77,8 @@ def main(yolo):
         if ret != True:
             break
         t1 = time.time()
-        virtualLine = int(0.7 * frame.shape[0])  # 虚拟线位置
-        cv2.line(frame, (0, virtualLine), (frame.shape[1], virtualLine), (255, 0, 0), 3)
+        virtualLine = int(0.5 * frame.shape[1])  # 虚拟线位置
+        cv2.line(frame, (virtualLine, 0), (virtualLine, frame.shape[0]), (255, 0, 0), 3)
 
         # image = Image.fromarray(frame)
         image = Image.fromarray(frame[..., ::-1])  # bgr to rgb
@@ -147,11 +147,11 @@ def main(yolo):
                 else:
                     cv2.putText(frame, 'up', (int(bbox[0] + 40), int(bbox[1] - 40)), 0, 5e-3 * 150, (color), 2)
                 if track.track_id not in haveCountedCar:
-                    if center[1] > virtualLine > lastCenter[1]:
+                    if center[0] > virtualLine > lastCenter[0]:
                         inCount += 1
                         haveCountedCar.append(track.track_id)
                     else:
-                        if center[1] < virtualLine < lastCenter[1]:
+                        if center[0] < virtualLine < lastCenter[0]:
                             outCount += 1
                             haveCountedCar.append(track.track_id)
 
