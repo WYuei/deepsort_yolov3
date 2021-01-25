@@ -4,6 +4,7 @@
 from __future__ import division, print_function, absolute_import
 import os
 import datetime
+import math
 from timeit import time
 import warnings
 import cv2
@@ -42,7 +43,8 @@ def main(yolo):
     max_cosine_distance = 0.5  # 余弦距离的控制阈值
     nn_budget = None
     nms_max_overlap = 0.3  # 非极大抑制的阈值
-
+    count = 0
+    class_name = ''
     counter = []
     # deep_sort
     model_filename = 'model_data/market1501.pb'
@@ -71,6 +73,8 @@ def main(yolo):
     inCount = 0
     outCount = 0
 
+    pixelPerReal = 0.5  # 像素：现实（m）
+    frameIndex = 0
     while True:
 
         ret, frame = video_capture.read()  # frame shape 640*480*3
@@ -79,6 +83,8 @@ def main(yolo):
         t1 = time.time()
         virtualLine = int(0.5 * frame.shape[1])  # 虚拟线位置
         cv2.line(frame, (virtualLine, 0), (virtualLine, frame.shape[0]), (255, 0, 0), 3)
+
+        frameIndex += 1  # frame的帧数
 
         # image = Image.fromarray(frame)
         image = Image.fromarray(frame[..., ::-1])  # bgr to rgb
@@ -132,20 +138,45 @@ def main(yolo):
 
             i += 1
             # bbox_center_point(x,y)
-            center = (int(((bbox[0]) + (bbox[2])) / 2), int(((bbox[1]) + (bbox[3])) / 2))
+
+            # center的x坐标，center的y坐标，center所在的帧数index
+            center = (int(((bbox[0]) + (bbox[2])) / 2), int(((bbox[1]) + (bbox[3])) / 2), frameIndex)
             # track_id[center]
+
             pts[track.track_id].append(center)
+
             thickness = 5
             # center point
-            cv2.circle(frame, (center), 1, color, thickness)
+            cv2.circle(frame, (center[0], center[1]), 1, color, thickness)
 
             # 做了一个车辆行驶方向的判断，还有是否经过虚拟线
-            if len(pts[track.track_id]) >= 8 is not None:
-                lastCenter = pts[track.track_id][len(pts[track.track_id]) - 8]
+            # 当前追踪的这个车辆id至少有超过2帧了
+            # center:x,y,frameIndex
+            trackIndex = len(pts[track.track_id]) - 1
+            if trackIndex >= 1 is not None:
+                lastIndex = trackIndex - 1
+                while True:
+                    # 如果上一帧相差的帧数大于8
+                    if pts[track.track_id][lastIndex][2] <= center[2] - 8:
+                        break
+                    # 没有超过8帧的话就继续往前
+                    lastIndex -= 1
+                    if lastIndex < 0:
+                        break
+                # 如果始终没有8帧以外的 就直接结束 不计算了
+
+                if lastIndex < 0:
+                    break
+                # 找到上一个center点了
+                lastCenter = pts[track.track_id][lastIndex]
+
+                # 行驶方向
                 if center[1] > lastCenter[1]:
                     cv2.putText(frame, 'down', (int(bbox[0] + 40), int(bbox[1] - 40)), 0, 5e-3 * 150, (color), 2)
                 else:
                     cv2.putText(frame, 'up', (int(bbox[0] + 40), int(bbox[1] - 40)), 0, 5e-3 * 150, (color), 2)
+
+                # 车流量计算
                 if track.track_id not in haveCountedCar:
                     if center[0] > virtualLine > lastCenter[0]:
                         inCount += 1
@@ -155,12 +186,20 @@ def main(yolo):
                             outCount += 1
                             haveCountedCar.append(track.track_id)
 
+                # 车速
+                dPixels = math.sqrt(pow(abs(center[0] - lastCenter[0]), 2) + pow(abs(center[1] - lastCenter[1]), 2))
+                dFrame = center[2] - lastCenter [2]
+                vCar = 1.0 * 24 * dPixels / pixelPerReal / dFrame
+                cv2.putText(frame, str(vCar)+'m/s' , (int(bbox[0] + 100 ), int(bbox[1] - 40)), 0, 5e-3 * 300, (color), 2)
+
+
             # draw motion path
             for j in range(1, len(pts[track.track_id])):
                 if pts[track.track_id][j - 1] is None or pts[track.track_id][j] is None:
                     continue
                 thickness = int(np.sqrt(64 / float(j + 1)) * 2)
-                cv2.line(frame, (pts[track.track_id][j - 1]), (pts[track.track_id][j]), (color), thickness)
+                cv2.line(frame, (pts[track.track_id][j - 1][0], pts[track.track_id][j - 1][1]),
+                         (pts[track.track_id][j][0], pts[track.track_id][j][1]), (color), thickness)
                 # cv2.putText(frame, str(class_names[j]),(int(bbox[0]), int(bbox[1] -20)),0, 5e-3 * 150, (255,255,255),2)
 
         count = len(set(counter))
@@ -193,9 +232,8 @@ def main(yolo):
     print("[Finish]")
     end = time.time()
 
-    if len(pts[track.track_id]) != None:
+    if len(pts) != None:
         print(args["input"][43:57] + ": " + str(count) + " " + str(class_name) + ' Found')
-
     else:
         print("[No Found]")
 
