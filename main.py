@@ -148,7 +148,7 @@ def main(yolo):
 
             pts[track.track_id].append(center)
 
-            print(center[0],center[1])
+            # print(center[0],center[1])
             thickness = 5
             # center point
             cv2.circle(frame, (center[0], center[1]), 1, color, thickness)
