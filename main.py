@@ -46,6 +46,9 @@ def main(yolo):
     count = 0
     class_name = ''
     counter = []
+
+    # 使用km/s还是m/s
+    kms = 1
     # deep_sort
     model_filename = 'model_data/market1501.pb'
     encoder = gdet.create_box_encoder(model_filename, batch_size=1)
@@ -73,7 +76,7 @@ def main(yolo):
     inCount = 0
     outCount = 0
 
-    pixelPerReal = 0.5  # 像素：现实（m）
+    pixelPerReal = 53.126  # 像素：现实（m）
     frameIndex = 0
     while True:
 
@@ -145,25 +148,26 @@ def main(yolo):
 
             pts[track.track_id].append(center)
 
+            print(center[0],center[1])
             thickness = 5
             # center point
             cv2.circle(frame, (center[0], center[1]), 1, color, thickness)
 
             # 做了一个车辆行驶方向的判断，还有是否经过虚拟线
-            # 当前追踪的这个车辆id至少有超过2帧了
+            # 当前追踪的这个车辆id至少有超过8帧了
             # center:x,y,frameIndex
-            trackIndex = len(pts[track.track_id]) - 1
-            if trackIndex >= 1 is not None:
-                lastIndex = trackIndex - 1
-                while True:
-                    # 如果上一帧相差的帧数大于8
-                    if pts[track.track_id][lastIndex][2] <= center[2] - 8:
-                        break
-                    # 没有超过8帧的话就继续往前
-                    lastIndex -= 1
-                    if lastIndex < 0:
-                        break
-                # 如果始终没有8帧以外的 就直接结束 不计算了
+            # trackIndex = len(pts[track.track_id]) - 1
+            if len(pts[track.track_id]) >= 8:
+                lastIndex = len(pts[track.track_id]) - 8
+                # while True:
+                #     # 如果上一帧相差的帧数大于8
+                #     if pts[track.track_id][lastIndex][2] <= center[2] - 8:
+                #         break
+                #     # 没有超过8帧的话就继续往前
+                #     lastIndex -= 1
+                #     if lastIndex < 0:
+                #         break
+                # # 如果始终没有8帧以外的 就直接结束 不计算了
 
                 if lastIndex < 0:
                     break
@@ -188,10 +192,17 @@ def main(yolo):
 
                 # 车速
                 dPixels = math.sqrt(pow(abs(center[0] - lastCenter[0]), 2) + pow(abs(center[1] - lastCenter[1]), 2))
-                dFrame = center[2] - lastCenter [2]
+                dFrame = center[2] - lastCenter[2]
                 vCar = 1.0 * 24 * dPixels / pixelPerReal / dFrame
-                cv2.putText(frame, str(vCar)+'m/s' , (int(bbox[0] + 100 ), int(bbox[1] - 40)), 0, 5e-3 * 300, (color), 2)
 
+                if kms == 1:
+                    cv2.putText(frame, str(int(vCar * 3.6)) + 'km/h', (int(bbox[0] + 100), int(bbox[1] - 40)), 0,
+                                5e-3 * 250, (color),
+                                2)
+                else:
+                    cv2.putText(frame, str(int(vCar)) + 'm/s', (int(bbox[0] + 100), int(bbox[1] - 40)), 0,
+                                5e-3 * 250, (color),
+                                2)
 
             # draw motion path
             for j in range(1, len(pts[track.track_id])):
@@ -209,7 +220,7 @@ def main(yolo):
         cv2.putText(frame, "Out Car Counter: " + str(outCount), (int(20), int(250)), 0, 5e-3 * 200, (0, 255, 0), 2)
         cv2.putText(frame, "FPS: %f" % (fps), (int(20), int(40)), 0, 5e-3 * 200, (0, 255, 0), 3)
         cv2.namedWindow("YOLO3_Deep_SORT", 0);
-        cv2.resizeWindow('YOLO3_Deep_SORT', 1024, 768);
+        cv2.resizeWindow('YOLO3_Deep_SORT', 2574, 1440);
         cv2.imshow('YOLO3_Deep_SORT', frame)
 
         if writeVideo_flag:
