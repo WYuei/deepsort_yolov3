@@ -28,6 +28,7 @@ ap.add_argument("-c", "--class", help="name of class", default="car")
 args = vars(ap.parse_args())
 
 pts = [deque(maxlen=30) for _ in range(9999)]
+vCar = [0 for i in range(9999)]
 haveCountedCar = []  # 已经被计数过的车辆
 warnings.filterwarnings('ignore')
 
@@ -180,29 +181,34 @@ def main(yolo):
                 else:
                     cv2.putText(frame, 'up', (int(bbox[0] + 40), int(bbox[1] - 40)), 0, 5e-3 * 150, (color), 2)
 
+                # 车速
+                if vCar[track.track_id] == 0 or frameIndex % 20 == 0:
+                    dPixels = math.sqrt(pow(abs(center[0] - lastCenter[0]), 2) + pow(abs(center[1] - lastCenter[1]), 2))
+                    dFrame = center[2] - lastCenter[2]
+                    vCar[track.track_id] = 1.0 * 24 * dPixels / pixelPerReal / dFrame
+
+                if kms == 1:
+                    cv2.putText(frame, str(int(vCar[track.track_id] * 3.6)) + 'km/h',
+                                (int(bbox[0] + 100), int(bbox[1] - 40)), 0,
+                                5e-3 * 250, (color),
+                                2)
+                else:
+                    cv2.putText(frame, str(int(vCar[track.track_id])) + 'm/s', (int(bbox[0] + 100), int(bbox[1] - 40)),
+                                0,
+                                5e-3 * 250, (color),
+                                2)
                 # 车流量计算
                 if track.track_id not in haveCountedCar:
                     if center[0] > virtualLine > lastCenter[0]:
                         inCount += 1
                         haveCountedCar.append(track.track_id)
+                        print('One Car In，Speed '+str(int(vCar[track.track_id] * 3.6)) + 'km/h')
                     else:
                         if center[0] < virtualLine < lastCenter[0]:
                             outCount += 1
                             haveCountedCar.append(track.track_id)
+                            print('One Car Out，Speed '+str(int(vCar[track.track_id] * 3.6)) + 'km/h')
 
-                # 车速
-                dPixels = math.sqrt(pow(abs(center[0] - lastCenter[0]), 2) + pow(abs(center[1] - lastCenter[1]), 2))
-                dFrame = center[2] - lastCenter[2]
-                vCar = 1.0 * 24 * dPixels / pixelPerReal / dFrame
-
-                if kms == 1:
-                    cv2.putText(frame, str(int(vCar * 3.6)) + 'km/h', (int(bbox[0] + 100), int(bbox[1] - 40)), 0,
-                                5e-3 * 250, (color),
-                                2)
-                else:
-                    cv2.putText(frame, str(int(vCar)) + 'm/s', (int(bbox[0] + 100), int(bbox[1] - 40)), 0,
-                                5e-3 * 250, (color),
-                                2)
 
             # draw motion path
             for j in range(1, len(pts[track.track_id])):
